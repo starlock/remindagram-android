@@ -22,6 +22,7 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.ImageView;
 
+
 public class MainActivity extends Activity implements OnClickListener {
 	private static final String TAG = "Remindagram";
 	
@@ -30,8 +31,8 @@ public class MainActivity extends Activity implements OnClickListener {
 	String takenFilename;
 	CoolImageList imageList;
     Bitmap tiledBG;
-	
-	@Override
+
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -107,7 +108,10 @@ public class MainActivity extends Activity implements OnClickListener {
     			Log.i(TAG,"Found: "+ filename);
     			items[i] = (Reminder)loadObject(filename);
     			if (items[i] != null) {
-    				items[i].LoadImage();
+    				if (!items[i].LoadImage()) {
+    					items[i].Delete();
+       					items[i] = null;
+    				}
     			}
     		} else {
     			items[i] = null;
@@ -139,6 +143,8 @@ public class MainActivity extends Activity implements OnClickListener {
 		if (v.getId() == R.id.imagelist) {
 			CoolImageList cil = (CoolImageList)v;
 			if (cil.clickAddReminder) {
+				imageList.blackened = true;
+				imageList.invalidate();
 				takePicture();
 			} else if (cil.clickShare){
 				
@@ -153,18 +159,23 @@ public class MainActivity extends Activity implements OnClickListener {
 	@Override
 	protected void onActivityResult(int requestCode, int resultCode, Intent data)
 	{
+		imageList.blackened = false;
 		if (resultCode == Activity.RESULT_CANCELED)
+		{
+			imageList.invalidate();
 			return;
+		}
 		for (int i = 5; i > 0; i--) {
 			items[i] = items[i - 1];
 		}
 		
 		Reminder rmd = new Reminder();
-		
 		rmd.bitmapFilename = takenFilename;
+		
 		rmd.LoadImage();
 		items[0] = rmd;
 		imageList.updateBitmaps();
 		imageList.invalidate();
+		saveReminders();
 	}
 }
