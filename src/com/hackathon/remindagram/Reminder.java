@@ -10,7 +10,7 @@ import android.util.Log;
 public class Reminder implements Serializable {
 	private static final String TAG = "Reminder";	
 	
-	Bitmap bitmap;
+	transient Bitmap bitmap;
 	String bitmapFilename;
 
 	public void LoadImage() {
