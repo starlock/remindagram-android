@@ -126,9 +126,7 @@ public class MainActivity extends Activity implements OnClickListener {
     		}
     	}
     }
-    
-    
-  
+      
     private void takePicture() {
     	Intent i = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
 		takenFilename = bitmapDirectory + "/pic" + String.valueOf (System.currentTimeMillis()) + ".jpg";

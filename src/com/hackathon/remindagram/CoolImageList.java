@@ -2,8 +2,10 @@ package com.hackathon.remindagram;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.text.style.TypefaceSpan;
@@ -15,7 +17,7 @@ import android.view.View;
 public class CoolImageList extends View {
 	public static final String TAG = "CoolImageList";
 	public Reminder [] reminders;
-	
+	public static Bitmap [] defaultBitmap = new Bitmap[6];
 	Paint paint;
 	Paint emptyPaint;
 	boolean swipingX;
@@ -23,6 +25,7 @@ public class CoolImageList extends View {
 	
 	int swipeImage;
 	int iw;
+	
 	float swipeStartX;
 	float swipeX;
 	float swipeStartY;
@@ -40,21 +43,23 @@ public class CoolImageList extends View {
 	boolean clickAddReminder;
 	boolean clickShare;
 
+	Context context;
 	
 	public CoolImageList(Context context, AttributeSet attr) {
 		super(context, attr);
-		init();
+		init(context);
 	}
 	public CoolImageList(Context context) {
 		super(context);
-		init();
+		init(context);
 	}
 	public CoolImageList(Context context, AttributeSet attr, int defStyle) {
 		super(context, attr, defStyle);
-		init();
+		init(context);
 	}
 
-	public void init() {
+	public void init(Context context) {
+		this.context = context;
 		paint = new Paint();
 		emptyPaint = new Paint();
 		emptyPaint.setColor(0xFF404040);
@@ -75,6 +80,22 @@ public class CoolImageList extends View {
 	public void updateBitmaps() {
 	}
 	
+	
+	Bitmap getDefaultBitmap(int i) {
+		if (defaultBitmap[i] == null) {
+			switch (i) {
+			case 0:	defaultBitmap[0] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default1); break;
+			case 1:	defaultBitmap[1] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default2); break;
+			case 2:	defaultBitmap[2] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default3); break;
+			case 3:	defaultBitmap[3] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default4); break;
+			case 4:	defaultBitmap[4] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default5); break;
+			case 5: defaultBitmap[5] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default6); break;
+			}
+		}
+		return defaultBitmap[i];
+	}
+	
+	
 	void paintImage(int i, Canvas canvas) {
 		if (i >= reminders.length)
 			return;
@@ -92,7 +113,8 @@ public class CoolImageList extends View {
 				fade = swipeX / (getWidth() * deleteThreshold);
 			}
 			else if (swipeX > getWidth() * (1.0f - deleteThreshold)) {
-				fade = ((swipeX - getWidth() * (1.0f - deleteThreshold)) / (getWidth() * deleteThreshold));
+				fade = 1.0f - ((swipeX - getWidth() * (1.0f - deleteThreshold)) / (getWidth() * deleteThreshold));
+				if (fade < 0) fade = 0;
 			}
 		}
 		
@@ -105,13 +127,25 @@ public class CoolImageList extends View {
 		col |= (int)(fade * 255) << 24;
 		paint.setColor(col);
 	
-		RectF rc = new RectF(x + 2, y + 2, x + iw - 2, y + iw - 2);
-		
+		Bitmap bitmap = null;
 		if (reminders[i] != null && reminders[i].bitmap != null) {
-			canvas.drawBitmap(reminders[i].bitmap, null, rc, paint);
+			bitmap = reminders[i].bitmap;
 		} else {
-			canvas.drawRect(rc, emptyPaint);
+			bitmap = getDefaultBitmap(i);
 		}
+		
+		int w = bitmap.getWidth();
+		int h = bitmap.getHeight();
+		
+		Rect srcRc = null;
+		if (w > h) {
+			srcRc = new Rect((w - h) / 2, 0, (w - h) / 2 + h, h);
+		} else {
+			srcRc = new Rect(0, (h - w) / 2, w, (h - w) / 2 + w);
+		}
+		
+		RectF rc = new RectF(x + 2, y + 2, x + iw - 2, y + iw - 2);
+		canvas.drawBitmap(bitmap, srcRc, rc, paint);
 	}
 	
 	@Override
@@ -143,7 +177,7 @@ public class CoolImageList extends View {
 		int bottomY = getHeight();
 		bottomY += (int)swipeYDelta;
 		
-		canvas.drawText("Add Reminder", getWidth()/2, bottomY+cmdBarSize/2, textPaint);
+		canvas.drawText("Add Snap!", getWidth()/2, bottomY+cmdBarSize/2, textPaint);
 	}
 	
 	int imageFromPos(float x, float y) {
