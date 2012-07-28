@@ -5,6 +5,8 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.graphics.Typeface;
+import android.text.style.TypefaceSpan;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -12,6 +14,32 @@ import android.view.View;
 
 public class CoolImageList extends View {
 	public static final String TAG = "CoolImageList";
+	public Reminder [] reminders;
+	
+	Paint paint;
+	Paint emptyPaint;
+	boolean swipingX;
+	boolean swipingY;
+	
+	int swipeImage;
+	int iw;
+	float swipeStartX;
+	float swipeX;
+	float swipeStartY;
+	float swipeY;
+	float swipeXDelta;
+	float swipeYDelta;
+	
+	float cmdBarSize = 60.0f;
+	Paint textPaint = new Paint();
+	
+	static final float deleteThreshold = 0.15f;
+	OnClickListener listener;
+	public Reminder clickedReminder;
+
+	boolean clickAddReminder;
+	boolean clickShare;
+
 	
 	public CoolImageList(Context context, AttributeSet attr) {
 		super(context, attr);
@@ -32,18 +60,17 @@ public class CoolImageList extends View {
 		emptyPaint.setColor(0xFF404040);
 		swipeImage = -1;
 		// TODO Auto-generated constructor stub
+		textPaint.setColor(0xFFFFFFFF);
+		textPaint.setTextAlign(Paint.Align.CENTER);
+		textPaint.setTextSize(cmdBarSize/2);
+		Typeface tf = Typeface.DEFAULT_BOLD;
+		textPaint.setTypeface(tf);
 	}
 	
-	public Reminder [] reminders;
 	
-	Paint paint;
-	Paint emptyPaint;
-	boolean swiping;
-	int swipeImage;
-	int iw;
-	float swipeStartX;
-	float swipeX;
-	static final float deleteThreshold = 0.15f;
+	public void setOnClickListener(OnClickListener listener) {
+		this.listener = listener;
+	}
 	
 	public void updateBitmaps() {
 	}
@@ -53,19 +80,31 @@ public class CoolImageList extends View {
 			return;
 		
 		int x = ((i & 1) == 1) ? iw : 0;
-		int y = (i / 2) * iw;
-		Log.i(TAG, "X: " + x + " Y: " + y);
+		int y = (int)((i / 2) * iw + swipeYDelta);
 		
 		paint.setColor(0xFFFFFFFF);
 		
-		if (swipeImage == i) {
+		float fade = 1.0f;
+		
+		if (swipeImage == i && swipingX) {
 			x += swipeX - swipeStartX;
 			if (swipeX < getWidth() * deleteThreshold) {
-				int col = 0xFFFFFF;
-				col |= (int)((swipeX / (getWidth() * deleteThreshold)) * 255) << 24;
-				paint.setColor(col);
+				fade = swipeX / (getWidth() * deleteThreshold);
+			}
+			else if (swipeX > getWidth() * (1.0f - deleteThreshold)) {
+				fade = ((swipeX - getWidth() * (1.0f - deleteThreshold)) / (getWidth() * deleteThreshold));
 			}
 		}
+		
+		if (swipingY) {
+			fade = 1.0f - Math.abs(swipeY - swipeStartY) / cmdBarSize;
+			if (fade < 0.4f) fade = 0.4f;
+		}
+		
+		int col = 0xFFFFFF;
+		col |= (int)(fade * 255) << 24;
+		paint.setColor(col);
+	
 		RectF rc = new RectF(x + 2, y + 2, x + iw - 2, y + iw - 2);
 		
 		if (reminders[i] != null && reminders[i].bitmap != null) {
@@ -86,6 +125,25 @@ public class CoolImageList extends View {
 		}
 		if (swipeImage != -1)
 			paintImage(swipeImage, canvas);
+		
+		float fade = 1.0f;
+		if (swipingY) {
+			fade = Math.abs(swipeY - swipeStartY) / cmdBarSize;
+			if (fade > 1.0f) fade = 1.0f;
+		}
+		fade = 1.0f;
+
+		int col = 0xFFFFFF;
+		col |= (int)(fade * 255) << 24;
+		textPaint.setColor(col);
+	
+		int topY = (int)swipeYDelta;
+		canvas.drawText("Share", getWidth()/2, topY - cmdBarSize/2, textPaint);
+		
+		int bottomY = getHeight();
+		bottomY += (int)swipeYDelta;
+		
+		canvas.drawText("Add Reminder", getWidth()/2, bottomY+cmdBarSize/2, textPaint);
 	}
 	
 	int imageFromPos(float x, float y) {
@@ -97,15 +155,37 @@ public class CoolImageList extends View {
 		return idx;
 	}
 	
-	void endSwipe() {
-		// Delete the image, etc.
-		if (swipeX < getWidth() * 0.1) {
-			reminders[swipeImage].Delete();
-			for (int i = swipeImage; i < reminders.length - 1; i++) {
-				reminders[i] = reminders[i+1];
+	// Returns true if a swipe action was detected and acted upon.
+	boolean endSwipe() {
+		if (swipingX) {
+			if (swipeImage == -1)
+				return false;
+			// Delete the image, etc.
+			if (swipeX < getWidth() * deleteThreshold || swipeX > getWidth() * (1.0f - deleteThreshold)) {
+				reminders[swipeImage].Delete();
+				for (int i = swipeImage; i < reminders.length - 1; i++) {
+					reminders[i] = reminders[i+1];
+				}
+				reminders[reminders.length - 1] = null;
+				return true;
 			}
-			reminders[reminders.length - 1] = null;
 		}
+		else if (swipingY) {
+			if (swipeYDelta == -cmdBarSize) {
+				clickAddReminder = true;
+				listener.onClick(this);
+			} else if (swipeYDelta == cmdBarSize) {
+				clickShare = true;
+				listener.onClick(this);
+			}
+		}
+		return false;
+	}
+	
+	void onImageClick() {
+		clickedReminder = reminders[swipeImage];
+		if (listener != null)
+			listener.onClick(this);
 	}
 	
 	public boolean onTouchEvent(final MotionEvent ev) {
@@ -113,24 +193,59 @@ public class CoolImageList extends View {
 			final int action = ev.getActionMasked();
 			switch (action) {
 			case MotionEvent.ACTION_DOWN:
+				clickAddReminder = false;
+				clickShare = false;
 				int img = imageFromPos(ev.getX(), ev.getY());
 				if (img != -1 && reminders[img] != null) {
 					swipeImage = img;
-					swipeStartX = ev.getX();
-					swipeX = ev.getX();
-					swiping = true;
 				}
+				swipeStartX = ev.getX();
+				swipeX = ev.getX();
+				swipeStartY = ev.getY();
+				swipeY = ev.getY();
 				break;
-			case MotionEvent.ACTION_UP:
-				endSwipe();
 				
-				swiping = false;
+			case MotionEvent.ACTION_UP:
+				if (!endSwipe()) {
+					Log.i(TAG, "Hello");
+					if (swipeImage != -1) {
+						Log.i(TAG, "Hello2");
+							
+						if (Math.abs(swipeX - swipeStartX) < 15)
+							onImageClick();
+					}
+				}
+				swipingX = false;
+				swipingY = false;
 				swipeX = 0;
 				swipeImage = -1;
+				swipeXDelta = 0;
+				swipeYDelta = 0;
+				
 				invalidate();
 				break;
+				
 			case MotionEvent.ACTION_MOVE:
 				swipeX = ev.getX();
+				swipeY = ev.getY();
+				float yd = Math.abs(swipeY - swipeStartY);
+				float xd = Math.abs(swipeX - swipeStartX);
+				if (!swipingX && !swipingY) {
+					if (yd > 5)
+						swipingY = true;
+					else if (xd > 5)
+						swipingX = true;
+				}
+				if (swipingX) {
+					swipeXDelta = swipeX - swipeStartX;
+				}
+				if (swipingY) {
+					swipeYDelta = swipeY - swipeStartY;
+					if (swipeYDelta > cmdBarSize)
+						swipeYDelta = cmdBarSize;
+					if (swipeYDelta < -cmdBarSize)
+						swipeYDelta = -cmdBarSize;
+				}
 				invalidate();
 				break;
 			default:
@@ -143,17 +258,16 @@ public class CoolImageList extends View {
 	
 	@Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int len = reminders == null ? 2 : reminders.length;
-		setMeasuredDimension(
-    		MeasureSpec.getSize(widthMeasureSpec),
-    		MeasureSpec.getSize(widthMeasureSpec) * ((len + 1) / 2));
+        //int len = reminders == null ? 2 : reminders.length;
+		//setMeasuredDimension(
+    //		MeasureSpec.getSize(widthMeasureSpec),
+    	//	MeasureSpec.getSize(widthMeasureSpec) * ((len + 1) / 2));
 
-		/*
-        int len = bitmaps == null ? 2 : bitmaps.length;
+		
+      //  int len = bitmaps == null ? 2 : bitmaps.length;
 		setMeasuredDimension(
     		MeasureSpec.getSize(widthMeasureSpec),
     		MeasureSpec.getSize(heightMeasureSpec));
-   */
     }
 	
 }

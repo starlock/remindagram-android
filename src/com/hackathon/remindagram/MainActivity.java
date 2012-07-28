@@ -1,6 +1,11 @@
 package com.hackathon.remindagram;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
 import android.net.Uri;
 import android.os.Bundle;
@@ -24,7 +29,9 @@ public class MainActivity extends Activity implements OnClickListener {
     String bitmapDirectory;
 	String takenFilename;
 	CoolImageList imageList;
-    @Override
+    Bitmap tiledBG;
+	
+	@Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -34,34 +41,115 @@ public class MainActivity extends Activity implements OnClickListener {
         imageList = (CoolImageList)findViewById(R.id.imagelist);
         items = new Reminder[6];
         imageList.reminders = items;
-        for (int i = 0; i < 6; i++) {
-        	items[i] = null;
-        }
-        ((Button)findViewById(R.id.buttonSnap)).setOnClickListener(this);
+        loadReminders();
+        
+        imageList.setOnClickListener(this);
     }
     
     public void onDestroy() {
     	super.onDestroy();
+    	
+    	saveReminders();
     	// TEMPORARY: Just kill all the images
+    	//for (int i = 0; i < items.length; i++) {
+    	//	if (items[i] != null)
+    	//		items[i].Delete();
+    	//}
+    }
+
+    public static void saveObject(Object o, String filename) {
+    	FileOutputStream fos = null;
+        ObjectOutputStream out = null;
+        try
+        {
+            fos = new FileOutputStream(filename);
+            out = new ObjectOutputStream(fos);
+            out.writeObject(o);
+            out.close();
+        }
+        catch(IOException ex)
+        {
+    		Log.i(TAG, "IOException");
+            ex.printStackTrace();
+        }
+    }
+    
+    public static Object loadObject(String filename) {
+    	FileInputStream fis = null;
+    	ObjectInputStream in = null;
+    	Object o = null;
+    	try
+    	{
+    	    fis = new FileInputStream(filename);
+    	    in = new ObjectInputStream(fis);
+    	    o = in.readObject();
+    	    in.close();
+        }
+    	catch(IOException ex)
+    	{
+    		Log.i(TAG, "IOException");
+    		ex.printStackTrace();
+    	}
+    	catch(ClassNotFoundException ex)
+    	{
+    		Log.i(TAG, "ClassNotFoundException");
+    		ex.printStackTrace();
+    	}
+    	return o;
+    }
+    
+    
+    private void loadReminders() {
     	for (int i = 0; i < items.length; i++) {
-    		if (items[i] != null)
-    			items[i].Delete();
+    		String filename = bitmapDirectory + "/reminder" + i + ".bin";
+    		File f = new File(filename);
+    		if (f.exists()) {
+    			Log.i(TAG,"Found: "+ filename);
+    			items[i] = (Reminder)loadObject(filename);
+    			if (items[i] != null) {
+    				items[i].LoadImage();
+    			}
+    		} else {
+    			items[i] = null;
+    		}
     	}
     }
     
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.activity_main, menu);
-        return true;
+    private void saveReminders() {
+    	for (int i = 0; i < items.length; i++) {
+    		String filename = bitmapDirectory + "/reminder" + i + ".bin";
+    		File f = new File(filename);
+    		if (items[i] != null) {
+    			saveObject(items[i], filename);
+    		} else {
+    			f.delete();
+    		}
+    	}
     }
+    
+    
   
-	@Override
-	public void onClick(View v) {
-		Intent i = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+    private void takePicture() {
+    	Intent i = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
 		takenFilename = bitmapDirectory + "/pic" + String.valueOf (System.currentTimeMillis()) + ".jpg";
 		i.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(new File (takenFilename)));
-
 		startActivityForResult(i, 1);
+    }
+    
+	@Override
+	public void onClick(View v) {
+		if (v.getId() == R.id.imagelist) {
+			CoolImageList cil = (CoolImageList)v;
+			if (cil.clickAddReminder) {
+				takePicture();
+			} else if (cil.clickShare){
+				
+			} else {
+				ReminderActivity.reminder = cil.clickedReminder;
+				Intent i = new Intent(this, ReminderActivity.class);
+				startActivity(i);
+			}
+		}
 	}
 
 	@Override
@@ -75,22 +163,9 @@ public class MainActivity extends Activity implements OnClickListener {
 		
 		Reminder rmd = new Reminder();
 		
-		BitmapFactory.Options bitmapOptions = new BitmapFactory.Options();  
-		bitmapOptions.inSampleSize = 4;  
-		Log.i(TAG, takenFilename);
-		rmd.bitmap = BitmapFactory.decodeFile(takenFilename, bitmapOptions);
 		rmd.bitmapFilename = takenFilename;
-		Log.i(TAG, "Decoded");
-		int w = rmd.bitmap.getWidth();
-		int h = rmd.bitmap.getHeight();
-		
-		if (w > h) {
-			rmd.bitmap = Bitmap.createBitmap(rmd.bitmap, (w - h) / 2, 0, h, h);
-		} else if (w < h) {
-			rmd.bitmap = Bitmap.createBitmap(rmd.bitmap, 0, (h - w) / 2, w, w);
-		}
+		rmd.LoadImage();
 		items[0] = rmd;
-		
 		imageList.updateBitmaps();
 		imageList.invalidate();
 	}
