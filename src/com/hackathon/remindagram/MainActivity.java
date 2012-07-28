@@ -20,42 +20,45 @@ import android.widget.ImageView;
 public class MainActivity extends Activity implements OnClickListener {
 	private static final String TAG = "Remindagram";
 	
-    Bitmap [] items;
-	ImageView [] imageViews;
+    Reminder [] items;
+    String bitmapDirectory;
 	String takenFilename;
-	
+	CoolImageList imageList;
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-    	items = new Bitmap[6];
-    	imageViews = new ImageView[6];
-        imageViews[0] = (ImageView)findViewById(R.id.imageView0);
-        imageViews[1] = (ImageView)findViewById(R.id.imageView1);
-        imageViews[2] = (ImageView)findViewById(R.id.imageView2);
-        imageViews[3] = (ImageView)findViewById(R.id.imageView3);
-        imageViews[4] = (ImageView)findViewById(R.id.imageView4);
-        imageViews[5] = (ImageView)findViewById(R.id.imageView5);
+    	
+        bitmapDirectory = Environment.getExternalStorageDirectory().getAbsolutePath();
+        
+        imageList = (CoolImageList)findViewById(R.id.imagelist);
+        items = new Reminder[6];
+        imageList.reminders = items;
+        for (int i = 0; i < 6; i++) {
+        	items[i] = null;
+        }
+        ((Button)findViewById(R.id.buttonSnap)).setOnClickListener(this);
     }
-
+    
+    public void onDestroy() {
+    	super.onDestroy();
+    	// TEMPORARY: Just kill all the images
+    	for (int i = 0; i < items.length; i++) {
+    		if (items[i] != null)
+    			items[i].Delete();
+    	}
+    }
+    
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.activity_main, menu);
-        ((Button)findViewById(R.id.buttonSnap)).setOnClickListener(this);
         return true;
     }
-    
-    private void updateImageViews() {
-    	for (int i = 0; i < 6; i++) {
-    		if (items[i] != null)
-    			imageViews[i].setImageBitmap(items[i]);
-    	}
-    }
-	
+  
 	@Override
 	public void onClick(View v) {
 		Intent i = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-		takenFilename = Environment.getExternalStorageDirectory() + "/testExtra" + String.valueOf (System.currentTimeMillis()) + ".jpg";
+		takenFilename = bitmapDirectory + "/pic" + String.valueOf (System.currentTimeMillis()) + ".jpg";
 		i.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(new File (takenFilename)));
 
 		startActivityForResult(i, 1);
@@ -70,23 +73,25 @@ public class MainActivity extends Activity implements OnClickListener {
 			items[i] = items[i - 1];
 		}
 		
-		Bitmap bmp;// = (Bitmap) data.getExtras().get("data"); 
+		Reminder rmd = new Reminder();
+		
 		BitmapFactory.Options bitmapOptions = new BitmapFactory.Options();  
-		// Limit the filesize since 5MP pictures will kill you RAM  
 		bitmapOptions.inSampleSize = 4;  
 		Log.i(TAG, takenFilename);
-		bmp = BitmapFactory.decodeFile(takenFilename, bitmapOptions);
+		rmd.bitmap = BitmapFactory.decodeFile(takenFilename, bitmapOptions);
+		rmd.bitmapFilename = takenFilename;
 		Log.i(TAG, "Decoded");
-		int w = bmp.getWidth();
-		int h = bmp.getHeight();
-		if (w == h) {
-			items[0] = bmp;
-		} else if (w > h) {
-			items[0] = Bitmap.createBitmap(bmp, (w - h) / 2, 0, h, h);
-		} else {
-			items[0] = Bitmap.createBitmap(bmp, 0, (h - w) / 2, w, w);
-		}
+		int w = rmd.bitmap.getWidth();
+		int h = rmd.bitmap.getHeight();
 		
-		updateImageViews();
+		if (w > h) {
+			rmd.bitmap = Bitmap.createBitmap(rmd.bitmap, (w - h) / 2, 0, h, h);
+		} else if (w < h) {
+			rmd.bitmap = Bitmap.createBitmap(rmd.bitmap, 0, (h - w) / 2, w, w);
+		}
+		items[0] = rmd;
+		
+		imageList.updateBitmaps();
+		imageList.invalidate();
 	}
 }
