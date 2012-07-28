@@ -1,7 +1,6 @@
 bin
 obj
 gen
-libs
 
 # built application files
 *.apk
