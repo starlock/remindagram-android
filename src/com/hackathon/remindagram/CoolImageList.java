@@ -5,6 +5,7 @@ import java.util.TimerTask;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.Bitmap.Config;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -20,7 +21,8 @@ import android.view.View;
 public class CoolImageList extends View {
 	public static final String TAG = "CoolImageList";
 	public Reminder [] reminders;
-	public static Bitmap [] defaultBitmap = new Bitmap[6];
+	Bitmap dragIcon;
+	Bitmap emptyImage;
 	Paint paint;
 	Paint emptyPaint;
 	boolean swipingX;
@@ -45,15 +47,15 @@ public class CoolImageList extends View {
 	float swipeXDelta;
 	float swipeYDelta;
 	
-	float cmdBarSize = 60.0f;
-	Paint textPaint = new Paint();
+	static final float cmdBarSize = 60.0f;
+	Paint textPaint;
 	
 	static final float deleteThreshold = 0.15f;
 	OnClickListener listener;
 	public Reminder clickedReminder;
 
-	boolean clickAddReminder;
-	boolean clickShare;
+	boolean clickedAddReminder;
+	boolean clickedShare;
 	boolean blackened;
 	
 	Timer dragTimer;
@@ -73,12 +75,13 @@ public class CoolImageList extends View {
 	public CoolImageList(Context context, AttributeSet attr, int defStyle) {
 		super(context, attr, defStyle);
 		init(context);
-	}
+	} 
 
 	public void init(Context context) {
 		this.context = context;
 		paint = new Paint();
 		emptyPaint = new Paint();
+		textPaint = new Paint();
 		emptyPaint.setColor(0xFF404040);
 		swipeImage = -1;
 		errorImage = -1;
@@ -90,7 +93,7 @@ public class CoolImageList extends View {
 		textPaint.setTextSize(cmdBarSize/2);
 		Typeface tf = Typeface.DEFAULT_BOLD;
 		textPaint.setTypeface(tf);
-		
+		dragIcon = BitmapFactory.decodeResource(context.getResources(), R.drawable.drag_icon);
 	}
 	
 	
@@ -102,24 +105,17 @@ public class CoolImageList extends View {
 	}
 	
 	
-	Bitmap getDefaultBitmap(int i) {
-		if (defaultBitmap[i] == null) {
-			switch (i) {
-			case 0:	defaultBitmap[0] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default1); break;
-			case 1:	defaultBitmap[1] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default2); break;
-			case 2:	defaultBitmap[2] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default3); break;
-			case 3:	defaultBitmap[3] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default4); break;
-			case 4:	defaultBitmap[4] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default5); break;
-			case 5: defaultBitmap[5] = BitmapFactory.decodeResource(context.getResources(), R.drawable.default6); break;
-			}
-		}
-		return defaultBitmap[i];
-	}
 	
 	
 	void paintImage(int i, Canvas canvas) {
 		if (i >= reminders.length)
 			return;
+		
+		if (emptyImage == null)
+		{
+			emptyImage = Bitmap.createBitmap(iw, iw, Config.ARGB_8888);
+			emptyImage.eraseColor(0xFF202020);
+		}
 		
 		int draw_w = iw;
 		int draw_h = iw;
@@ -150,7 +146,7 @@ public class CoolImageList extends View {
 		} else if (dragging && dragImage == i) {
 			x += swipeX - swipeStartX;
 			y += swipeY - swipeStartY;
-			int dragZoom = 20;
+			int dragZoom = 40;
 			x -= dragZoom;
 			y -= dragZoom;
 			draw_w += dragZoom*2;
@@ -158,7 +154,7 @@ public class CoolImageList extends View {
 		}
 		
 		if (swipingY) {
-			fade = 1.0f - Math.abs(swipeY - swipeStartY) / cmdBarSize * 0.6f;
+			fade = 1.0f - Math.abs(swipeYDelta) / cmdBarSize * 0.6f;
 			if (fade < 0.4f) fade = 0.4f;
 		}
 		
@@ -171,12 +167,12 @@ public class CoolImageList extends View {
 		}
 		
 		Bitmap bitmap = null;
-		if (reminders[i] != null && reminders[i].bitmap != null) {
+		if (reminders[i] != null)
 			bitmap = reminders[i].bitmap;
-		} else {
-			bitmap = getDefaultBitmap(i);
-		}
 		
+		if (bitmap == null) {
+			bitmap = emptyImage;
+		}
 		int w = bitmap.getWidth();
 		int h = bitmap.getHeight();
 		
@@ -188,6 +184,8 @@ public class CoolImageList extends View {
 		}
 		
 		RectF rc = new RectF(x + 2, y + 2, x + draw_w - 2, y + draw_h - 2);
+		
+		
 		canvas.drawBitmap(bitmap, srcRc, rc, paint);
 	}
 	
@@ -223,6 +221,8 @@ public class CoolImageList extends View {
 		int bottomY = getHeight();
 		bottomY += (int)swipeYDelta;
 		
+		canvas.drawBitmap(dragIcon, getWidth()/2-dragIcon.getWidth()/2, (int)(bottomY - dragIcon.getHeight()*1.5f), textPaint);
+		
 		canvas.drawText("Add Snap!", getWidth()/2, bottomY+cmdBarSize/2, textPaint);
 	}
 	
@@ -252,10 +252,10 @@ public class CoolImageList extends View {
 		}
 		else if (swipingY) {
 			if (swipeYDelta == -cmdBarSize) {
-				clickAddReminder = true;
+				clickedAddReminder = true;
 				listener.onClick(this);
 			} else if (swipeYDelta == cmdBarSize) {
-				clickShare = true;
+				clickedShare = true;
 				listener.onClick(this);
 			}
 		}
@@ -273,8 +273,8 @@ public class CoolImageList extends View {
 			final int action = ev.getActionMasked();
 			switch (action) {
 			case MotionEvent.ACTION_DOWN:
-				clickAddReminder = false;
-				clickShare = false;
+				clickedAddReminder = false;
+				clickedShare = false;
 				dragging = false;
 				int img = imageFromPos(ev.getX(), ev.getY());
 				if (img != -1 && reminders[img] != null) {
@@ -294,6 +294,13 @@ public class CoolImageList extends View {
 							swipingY = false;
 							swipingX = false;
 							dragging = true;
+							
+							CoolImageList.this.post(new Runnable() {
+								@Override
+								public void run() {
+									invalidate();
+								}
+							});
 						}
 					}
 				}, 400);
@@ -367,6 +374,10 @@ public class CoolImageList extends View {
 						swipeYDelta = cmdBarSize;
 					if (swipeYDelta < -cmdBarSize)
 						swipeYDelta = -cmdBarSize;
+					
+					// Block swiping downwards for now
+					if (swipeYDelta > 0)
+						swipeYDelta = 0;
 				}
 				invalidate();
 				break;
@@ -380,14 +391,7 @@ public class CoolImageList extends View {
 	
 	@Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        //int len = reminders == null ? 2 : reminders.length;
-		//setMeasuredDimension(
-    //		MeasureSpec.getSize(widthMeasureSpec),
-    	//	MeasureSpec.getSize(widthMeasureSpec) * ((len + 1) / 2));
-
-		
-      //  int len = bitmaps == null ? 2 : bitmaps.length;
-		setMeasuredDimension(
+        setMeasuredDimension(
     		MeasureSpec.getSize(widthMeasureSpec),
     		MeasureSpec.getSize(heightMeasureSpec));
     }
