@@ -1,14 +1,15 @@
-package com.hackathon.remindagram;
+package com.henrikrydgard.mindsnap;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Date;
 
+import com.henrikrydgard.mindsnap.R;
+
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.media.ExifInterface;
 import android.util.Log;

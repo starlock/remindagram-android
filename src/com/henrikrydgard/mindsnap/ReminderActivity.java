@@ -1,4 +1,6 @@
-package com.hackathon.remindagram;
+package com.henrikrydgard.mindsnap;
+
+import com.henrikrydgard.mindsnap.R;
 
 import android.os.Bundle;
 import android.app.Activity;

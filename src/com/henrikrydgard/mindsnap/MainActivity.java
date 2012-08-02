@@ -1,4 +1,4 @@
-package com.hackathon.remindagram;
+package com.henrikrydgard.mindsnap;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -9,21 +9,15 @@ import java.io.ObjectOutputStream;
 import java.nio.channels.FileChannel;
 import java.util.Date;
 
-import android.net.Uri;
+import com.henrikrydgard.mindsnap.R;
+
 import android.os.Bundle;
 import android.os.Environment;
-import android.provider.MediaStore;
 import android.app.Activity;
-import android.content.ContextWrapper;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.util.Log;
-import android.view.Menu;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.widget.Button;
-import android.widget.ImageView;
 
 
 public class MainActivity extends Activity implements OnClickListener {
@@ -31,12 +25,10 @@ public class MainActivity extends Activity implements OnClickListener {
 	
     Reminder [] items;
     String bitmapDirectory;
-    String captureDirectory;
 	String takenFilename;
 	String captureFilename;
 	CoolImageList imageList;
 
-	
 	public static void copyFile(File src, File dst) throws IOException
 	{
 	    FileChannel inChannel = new FileInputStream(src).getChannel();
@@ -54,13 +46,26 @@ public class MainActivity extends Activity implements OnClickListener {
 	    }
 	}
 
+	public static boolean writeFile(byte [] data, File dst)
+	{
+		try {
+		    FileOutputStream stream = new FileOutputStream(dst);
+		    stream.write(data);
+		    stream.close();
+		    return true;
+		} catch (IOException e) {
+			Log.e(TAG, e.getMessage());
+			return false;
+		}
+	}
+
+
 	@Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
     	
         bitmapDirectory = getFilesDir().getAbsolutePath();
-        captureDirectory = Environment.getExternalStorageDirectory().getAbsolutePath();
         
         Log.i(TAG, "User Directory: " + bitmapDirectory);
         
@@ -105,8 +110,7 @@ public class MainActivity extends Activity implements OnClickListener {
 				for (int i = 0; i < items.length; i++) {
 					if (items[i] != null
 							&& items[i].bitmapFilename != null
-							&& items[i].bitmapFilename
-									.endsWith(child.getName())) {
+							&& items[i].bitmapFilename.endsWith(child.getName())) {
 						found = true;
 					}
 				}
@@ -188,10 +192,8 @@ public class MainActivity extends Activity implements OnClickListener {
     }
 
     private void takePicture() {
-    	Intent i = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-		captureFilename = captureDirectory + "/pic" + String.valueOf (System.currentTimeMillis()) + ".jpg";
     	takenFilename = bitmapDirectory + "/pic" + String.valueOf (System.currentTimeMillis()) + ".jpg";
-		i.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(new File(captureFilename)));
+    	Intent i = new Intent(this, CameraActivity.class);
 		startActivityForResult(i, 1);
     }
     
@@ -223,23 +225,27 @@ public class MainActivity extends Activity implements OnClickListener {
 			imageList.invalidate();
 			return;
 		}
-		for (int i = 5; i > 0; i--) {
-			items[i] = items[i - 1];
+
+		if (CameraActivity.jpegTaken != null) {
+			Log.i(TAG, "Got jpeg as byte array!");
+			if (writeFile(CameraActivity.jpegTaken, new File(takenFilename))) {
+				// Managed to write the file, let's go ahead and add it.
+				Reminder rmd = new Reminder();
+				rmd.bitmapFilename = takenFilename;
+				rmd.timeCreated = new Date();
+				rmd.defaultImage = -1;
+				rmd.LoadImage(this);
+				for (int i = 5; i > 0; i--) {
+					items[i] = items[i - 1];
+				}
+				items[0] = rmd;
+				imageList.updateBitmaps();
+				imageList.invalidate();
+				saveReminders();
+			}
+		} else {
+			Log.i(TAG, "Got no jpeg :(");
 		}
-		try {
-			copyFile(new File(captureFilename), new File(takenFilename));
-			new File(captureFilename).delete();
-			Reminder rmd = new Reminder();
-			rmd.bitmapFilename = takenFilename;
-			rmd.timeCreated = new Date();
-			rmd.defaultImage = -1;
-			rmd.LoadImage(this);
-			items[0] = rmd;
-			imageList.updateBitmaps();
-			imageList.invalidate();
-			saveReminders();
-		} catch (IOException io) {
-			Log.i(TAG, io.toString());
-		}
+		imageList.invalidate();
 	}
 }

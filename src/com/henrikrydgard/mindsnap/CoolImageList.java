@@ -1,7 +1,9 @@
-package com.hackathon.remindagram;
+package com.henrikrydgard.mindsnap;
 
 import java.util.Timer;
 import java.util.TimerTask;
+
+import com.henrikrydgard.mindsnap.R;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -94,6 +96,7 @@ public class CoolImageList extends View {
 		Typeface tf = Typeface.DEFAULT_BOLD;
 		textPaint.setTypeface(tf);
 		dragIcon = BitmapFactory.decodeResource(context.getResources(), R.drawable.drag_icon);
+		Log.i(TAG, "CoolImageList");
 	}
 	
 	

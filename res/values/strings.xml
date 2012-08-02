@@ -1,10 +1,10 @@
 <resources>
 
-    <string name="app_name">RemindaGram</string>
-    <string name="hello_world">Hello world!</string>
-    <string name="menu_settings">Settings</string>
+    <string name="app_name">MindSnap</string>
     <string name="title_activity_main">MindSnap</string>
     <string name="title_activity_camera">CameraActivity</string>
     <string name="title_activity_reminder">ReminderActivity</string>
+    <string name="next_cam">Next Cam</string>
+    <string name="take_button">Take!</string>
 
 </resources>
