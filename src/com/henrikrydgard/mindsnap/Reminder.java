@@ -16,10 +16,10 @@ import android.util.Log;
 
 public class Reminder implements Serializable {
 	private static final String TAG = "Reminder";
-	
-	
+		
 	// Transient so we don't serialize it, since we can't.
 	transient Bitmap bitmap;
+	transient Bitmap thumb;  // TODO
 	
 	Date timeCreated;
 	String thumbFilename;  // TODO
@@ -40,44 +40,15 @@ public class Reminder implements Serializable {
 	}
 
 	public boolean LoadImage(Context context) {
-		
 		if (defaultImage != -1) {
 			bitmap = getDefaultBitmap(context, defaultImage);
 			return true;
 		}
 		
-		BitmapFactory.Options bitmapOptions = new BitmapFactory.Options();  
-		bitmapOptions.inSampleSize = 4;  
-		bitmap = BitmapFactory.decodeFile(bitmapFilename, bitmapOptions);
-		if (bitmap == null)
-			return false;
-		Log.i(TAG, "Decoded " + bitmap.getWidth() + " x " + bitmap.getHeight());
-		File imageFile = new File(bitmapFilename.toString());
-		try {
-			ExifInterface exif = new ExifInterface(imageFile.getAbsolutePath());
-			int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
-			int rotate = 0;
-			switch (orientation) {
-			case ExifInterface.ORIENTATION_ROTATE_270:
-				rotate -= 90;
-			case ExifInterface.ORIENTATION_ROTATE_180:
-				rotate -= 90;
-			case ExifInterface.ORIENTATION_ROTATE_90:
-				rotate -= 90;
-			}
+		int inSampleSize = 4;
 		
-			Log.i(TAG, "Detected orientation " + orientation);
-			if (rotate != 0) {
-				Log.i(TAG, "Rotating... " + rotate);
-				bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
-				Matrix matrix = new Matrix();
-				matrix.postRotate(-rotate);
-				bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(),
-						bitmap.getHeight(), matrix, true);
-			}
-		} catch (IOException io) {
-			Log.i(TAG, "EXIF failed: " + io.toString());
-		}
+		// This stuff should be done on a background thread.
+		bitmap = BitmapUtil.loadBitmapRotated(bitmapFilename, inSampleSize);
 		return true;
 	}
 

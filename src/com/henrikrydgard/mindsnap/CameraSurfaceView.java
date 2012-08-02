@@ -3,6 +3,7 @@ package com.henrikrydgard.mindsnap;
 import java.io.IOException;
 import java.util.List;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.util.AttributeSet;
@@ -20,7 +21,7 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 	private SurfaceHolder holder;
 	private Camera camera;
 	private int numCameras;
-	private int curCameraId;
+	private static int curCameraId = 0;
 	private boolean error;  // Camera error of some sort
 	private Activity activity;  // Track the rotation through this activity. Must be set.
 	
@@ -30,8 +31,7 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 		this.context = context;
 		
 		numCameras = Camera.getNumberOfCameras();
-		curCameraId = 0;
-        
+	    
 		// Initiate the Surface Holder properly
 		this.holder = this.getHolder();
 		this.holder.addCallback(this);
@@ -54,6 +54,75 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 		}
 	}
 
+	int cameraDisplayOrientation;
+	int degrees;
+	int surfaceWidth;
+	int surfaceHeight;
+	boolean facingFront;
+	
+	private void setupCamera(Camera camera) {
+		camera.setDisplayOrientation(cameraDisplayOrientation);
+		Log.i(TAG, "Display rotation: " + degrees + /*"  Fixed cam orientation: " + camOrientation +*/ "  Camera display rotation set: " + cameraDisplayOrientation);
+		
+		// Now that the orientation is known, let's start setting up the parameters.
+		Camera.Parameters parameters = camera.getParameters();
+		parameters.setPictureFormat(ImageFormat.JPEG);
+		parameters.setJpegQuality(80);
+
+		// Set the orientation of the saved JPEG. Not quite sure how this makes sense, but meh.
+		if (facingFront) {
+			parameters.setRotation((360 - 90 + degrees) % 360);
+		} else {
+			parameters.setRotation((360 + 90 - degrees) % 360);
+		}
+
+		// We need to choose a preview size from the allowed sizes.
+		
+		Log.i(TAG, "Wanted preview size: " + surfaceWidth + " x " + surfaceHeight);
+		List<Camera.Size> previewSizes = parameters.getSupportedPreviewSizes();
+		
+		float aspect = (float)surfaceWidth/surfaceHeight;
+		
+		int bestWidth = 0;
+		int bestHeight = 0;
+		float bestScore = 99999.f;
+		
+		for (Camera.Size size : previewSizes) {
+			float sizeAspect = (float)size.width / size.height;
+			
+			// Throw out too small previews
+			if (size.width < 300 || size.height < 300)
+				continue;
+			
+			// float aspectScore = Math.abs(sizeAspect - aspect);
+
+			// First consider same orientation
+			float sizeScore = Math.abs(surfaceWidth - size.width) + Math.abs(surfaceHeight - size.height);  
+			Log.i(TAG, "Allowed preview size: " + size.width + " x " + size.height + ", score: " + sizeScore);
+			if (sizeScore < bestScore) {
+				bestWidth = size.width;
+				bestHeight = size.height;
+				bestScore = sizeScore;
+			}
+			
+			// Then consider 90 degree orientation
+			float sizeScore90 = Math.abs(surfaceHeight - size.width) + Math.abs(surfaceWidth - size.height);  
+			if (sizeScore90 < bestScore) {
+				bestWidth = size.width;
+				bestHeight = size.height;
+				bestScore = sizeScore90;
+			}
+		}
+		if (bestWidth == 0) {
+			error = true;
+			return;
+		}
+		Log.i(TAG, "Setting preview size: " + bestWidth + " x " + bestHeight);
+		parameters.setPreviewSize(bestWidth, bestHeight);
+		
+	    camera.setParameters(parameters);
+	}
+	
 	@Override
 	public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
 
@@ -62,9 +131,11 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 		android.hardware.Camera.CameraInfo info = new android.hardware.Camera.CameraInfo();
 		android.hardware.Camera.getCameraInfo(curCameraId, info);
 
+		facingFront = info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT;
+		
 		int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation(); 
 		int camOrientation = info.orientation;
-		int degrees = 0;
+		degrees = 0;
 		switch (displayRotation) {
 		case Surface.ROTATION_0:
 			degrees = 0;
@@ -81,84 +152,18 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 		}
 
 		int result;
-		if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+		if (facingFront) {
 			result = (camOrientation + degrees) % 360;
 			result = (360 - result) % 360; // compensate the mirror
 		} else { // back-facing
 			result = (camOrientation - degrees + 360) % 360;
 		}
-		camera.setDisplayOrientation(result);
-		Log.i(TAG, "Display rotation: " + degrees + "  Fixed cam orientation: " + camOrientation + "  Camera display rotation set: " + result);
 		
+		cameraDisplayOrientation = result;
+		surfaceWidth = width;
+		surfaceHeight = height;
 		
-		
-		// Now that the orientation is known, let's start setting up the parameters.
-		Camera.Parameters parameters = camera.getParameters();
-		parameters.setPictureFormat(ImageFormat.JPEG);
-		parameters.setJpegQuality(80);
-
-		// Set the orientation of the saved JPEG.
-
-		parameters.setRotation((360 + 90 - degrees) % 360);
-		/*
-		int orientation = activity.getWindowManager().getDefaultDisplay().getRotation();
-		orientation = (orientation + 45) / 90 * 90;
-		
-		int rotation = 0;
-		if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-			rotation = (info.orientation - orientation + 360) % 360;
-		} else { // back-facing camera
-			rotation = (info.orientation + orientation) % 360;
-		}
-		parameters.setRotation(rotation);
-		*/
-		
-
-		// We need to choose a preview size from the allowed sizes.
-		
-		Log.i(TAG, "Wanted preview size: " + width + " x " + height);
-		List<Camera.Size> previewSizes = parameters.getSupportedPreviewSizes();
-		
-		float aspect = (float)width/height;
-		
-		int bestWidth = 0;
-		int bestHeight = 0;
-		float bestScore = 99999.f;
-		
-		for (Camera.Size size : previewSizes) {
-			float sizeAspect = (float)size.width / size.height;
-			
-			// Throw out too small previews
-			if (size.width < 300 || size.height < 300)
-				continue;
-			
-			// float aspectScore = Math.abs(sizeAspect - aspect);
-
-			// First consider same orientation
-			float sizeScore = Math.abs(width - size.width) + Math.abs(height - size.height);  
-			Log.i(TAG, "Allowed preview size: " + size.width + " x " + size.height + ", score: " + sizeScore);
-			if (sizeScore < bestScore) {
-				bestWidth = size.width;
-				bestHeight = size.height;
-				bestScore = sizeScore;
-			}
-			
-			// Then consider 90 degree orientation
-			float sizeScore90 = Math.abs(height - size.width) + Math.abs(width - size.height);  
-			if (sizeScore90 < bestScore) {
-				bestWidth = size.width;
-				bestHeight = size.height;
-				bestScore = sizeScore90;
-			}
-		}
-		if (bestWidth == 0) {
-			error = true;
-			return;
-		}
-		Log.i(TAG, "Setting preview size: " + bestWidth + " x " + bestHeight);
-		parameters.setPreviewSize(bestWidth, bestHeight);
-		
-	    camera.setParameters(parameters);
+		setupCamera(camera);
 		camera.startPreview();
 		error = false;
 	}
@@ -181,8 +186,13 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 	}
 
 	// Want to be able to switch to front camera too!
+	@SuppressLint("NewApi")
 	public void switchCamera() {
-		// TODO
+		// Just increment the camera ID and restart the activity.
+		curCameraId = (curCameraId + 1) % numCameras;
+		activity.recreate();
+		
+		// activity.startActivity(activity.getIntent()); activity.finish(); 
 	}
 
 
