@@ -56,10 +56,64 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 
 	@Override
 	public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-		// Now that the size is known, set up the camera parameters and begin
-		// the preview.
-		Camera.Parameters parameters = camera.getParameters();
+
+		// First, figure out and set the camera orientation correctly.
 		
+		android.hardware.Camera.CameraInfo info = new android.hardware.Camera.CameraInfo();
+		android.hardware.Camera.getCameraInfo(curCameraId, info);
+
+		int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation(); 
+		int camOrientation = info.orientation;
+		int degrees = 0;
+		switch (displayRotation) {
+		case Surface.ROTATION_0:
+			degrees = 0;
+			break;
+		case Surface.ROTATION_90:
+			degrees = 90;
+			break;
+		case Surface.ROTATION_180:
+			degrees = 180;
+			break;
+		case Surface.ROTATION_270:
+			degrees = 270;
+			break;
+		}
+
+		int result;
+		if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+			result = (camOrientation + degrees) % 360;
+			result = (360 - result) % 360; // compensate the mirror
+		} else { // back-facing
+			result = (camOrientation - degrees + 360) % 360;
+		}
+		camera.setDisplayOrientation(result);
+		Log.i(TAG, "Display rotation: " + degrees + "  Fixed cam orientation: " + camOrientation + "  Camera display rotation set: " + result);
+		
+		
+		
+		// Now that the orientation is known, let's start setting up the parameters.
+		Camera.Parameters parameters = camera.getParameters();
+		parameters.setPictureFormat(ImageFormat.JPEG);
+		parameters.setJpegQuality(80);
+
+		// Set the orientation of the saved JPEG.
+
+		parameters.setRotation((360 + 90 - degrees) % 360);
+		/*
+		int orientation = activity.getWindowManager().getDefaultDisplay().getRotation();
+		orientation = (orientation + 45) / 90 * 90;
+		
+		int rotation = 0;
+		if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+			rotation = (info.orientation - orientation + 360) % 360;
+		} else { // back-facing camera
+			rotation = (info.orientation + orientation) % 360;
+		}
+		parameters.setRotation(rotation);
+		*/
+		
+
 		// We need to choose a preview size from the allowed sizes.
 		
 		Log.i(TAG, "Wanted preview size: " + width + " x " + height);
@@ -101,51 +155,10 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 			error = true;
 			return;
 		}
-		
+		Log.i(TAG, "Setting preview size: " + bestWidth + " x " + bestHeight);
 		parameters.setPreviewSize(bestWidth, bestHeight);
-		// parameters.setPictureFormat(ImageFormat.JPEG);
-		android.hardware.Camera.CameraInfo info = new android.hardware.Camera.CameraInfo();
-		android.hardware.Camera.getCameraInfo(curCameraId, info);
-
-		int degrees = 0;
-		switch (activity.getWindowManager().getDefaultDisplay().getRotation()) {
-		case Surface.ROTATION_0:
-			degrees = 0;
-			break;
-		case Surface.ROTATION_90:
-			degrees = 90;
-			break;
-		case Surface.ROTATION_180:
-			degrees = 180;
-			break;
-		case Surface.ROTATION_270:
-			degrees = 270;
-			break;
-		}
-
-		int result;
-		if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-			result = (info.orientation + degrees) % 360;
-			result = (360 - result) % 360; // compensate the mirror
-		} else { // back-facing
-			result = (info.orientation - degrees + 360) % 360;
-		}
-		camera.setDisplayOrientation(result);
-
-		int orientation = activity.getWindowManager().getDefaultDisplay().getRotation();
-		orientation = (orientation + 45) / 90 * 90;
-		
-		int rotation = 0;
-		if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-			rotation = (info.orientation - orientation + 360) % 360;
-		} else { // back-facing camera
-			rotation = (info.orientation + orientation) % 360;
-		}
-		parameters.setRotation(rotation);
-		parameters.setJpegQuality(80);
 		
 	    camera.setParameters(parameters);
-		setCameraDisplayOrientation(activity, curCameraId, camera);
 		camera.startPreview();
 		error = false;
 	}
@@ -172,9 +185,5 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 		// TODO
 	}
 
-
-	public static void setCameraDisplayOrientation(Activity activity, int cameraId, android.hardware.Camera camera) {
-}
-		
 
 }

@@ -21,7 +21,8 @@ public class Reminder implements Serializable {
 	// Transient so we don't serialize it, since we can't.
 	transient Bitmap bitmap;
 	
-	Date timeCreated;	
+	Date timeCreated;
+	String thumbFilename;  // TODO
 	String bitmapFilename;
 	int defaultImage;
 	
@@ -50,7 +51,7 @@ public class Reminder implements Serializable {
 		bitmap = BitmapFactory.decodeFile(bitmapFilename, bitmapOptions);
 		if (bitmap == null)
 			return false;
-		Log.i(TAG, "Decoded");
+		Log.i(TAG, "Decoded " + bitmap.getWidth() + " x " + bitmap.getHeight());
 		File imageFile = new File(bitmapFilename.toString());
 		try {
 			ExifInterface exif = new ExifInterface(imageFile.getAbsolutePath());
@@ -71,9 +72,8 @@ public class Reminder implements Serializable {
 				bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
 				Matrix matrix = new Matrix();
 				matrix.postRotate(-rotate);
-				bitmap = Bitmap.createBitmap(bitmap, 0, 0, 
-						bitmap.getWidth(), bitmap.getHeight(), 
-				                              matrix, true);
+				bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(),
+						bitmap.getHeight(), matrix, true);
 			}
 		} catch (IOException io) {
 			Log.i(TAG, "EXIF failed: " + io.toString());
